@@ -13,29 +13,36 @@ import kotlinx.coroutines.launch
 class Player {
     class Frame(val data: ByteArray?, val endOfFrame: Boolean = false)
 
-    private var player = AudioTrack.Builder()
-        .setTransferMode(AudioTrack.MODE_STREAM)
-        .setAudioAttributes(
-            AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+    private var player: AudioTrack? = null
+
+    private fun getOrCreatePlayer(): AudioTrack {
+        if (player == null) {
+            player = AudioTrack.Builder()
+                .setTransferMode(AudioTrack.MODE_STREAM)
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setEncoding(AudioFormat.ENCODING_MP3)
+                        .setSampleRate(24000)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .build()
+                )
+                .setBufferSizeInBytes(
+                    AudioTrack.getMinBufferSize(
+                        24000,
+                        AudioFormat.CHANNEL_OUT_MONO,
+                        AudioFormat.ENCODING_MP3
+                    )
+                )
                 .build()
-        )
-        .setAudioFormat(
-            AudioFormat.Builder()
-                .setEncoding(AudioFormat.ENCODING_MP3)
-                .setSampleRate(24000)
-                .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                .build()
-        )
-        .setBufferSizeInBytes(
-            AudioTrack.getMinBufferSize(
-                24000,
-                AudioFormat.CHANNEL_OUT_MONO,
-                AudioFormat.ENCODING_MP3
-            )
-        )
-        .build()
+        }
+        return player!!
+    }
 
     private var a: Channel<ByteArray>? = null
     private var jobChannel = Channel<Channel<ByteArray>>()
@@ -59,13 +66,14 @@ class Player {
 
         for (job in jobChannel) {
             for (data in job) {
-                player.write(data, 0, data.size)
+                getOrCreatePlayer().write(data, 0, data.size)
             }
             delay(1500) // sweet spot.
             onCompleted()
         }
-        player.stop()
-        player.release()
+        player?.stop()
+        player?.release()
+        player = null
     }
 
     private var playing = false
@@ -75,12 +83,12 @@ class Player {
             return
         }
         playing = true
-        player.play()
+        getOrCreatePlayer().play()
     }
 
     fun pause() {
-        player.pause()
-        player.flush()
+        player?.pause()
+        player?.flush()
         playing = false
     }
 }
